@@ -163,9 +163,10 @@ class AppleMusicPlayerManager(
                         val rawPos = ctrl.currentPosition.coerceAtLeast(0L)
                         _state.update {
                             val cleanPos = filterStaleSeekPosition(rawPos, it.positionMs, nowMs)
+                            val posChanged = cleanPos != it.positionMs
                             it.copy(
                                 positionMs = cleanPos,
-                                positionUpdatedAtElapsedMs = nowMs,
+                                positionUpdatedAtElapsedMs = if (posChanged || !it.isPlaying || it.positionUpdatedAtElapsedMs == 0L) nowMs else it.positionUpdatedAtElapsedMs,
                                 durationMs = ctrl.duration.coerceAtLeast(it.durationMs)
                             )
                         }
@@ -1549,6 +1550,13 @@ class AppleMusicPlayerManager(
                 val sameVideoItem = current.currentItem?.id == resolvedId
                 val nowMs = SystemClock.elapsedRealtime()
                 val cleanPos = filterStaleSeekPosition(positionMs, current.positionMs, nowMs)
+                val posChanged = cleanPos != current.positionMs
+                val trackChanged = current.currentItem?.id != resolvedId
+                val updatedAt = if (posChanged || trackChanged || !effectivePlaying || isBuffering || current.positionUpdatedAtElapsedMs == 0L) {
+                    nowMs
+                } else {
+                    current.positionUpdatedAtElapsedMs
+                }
                 current.copy(
                     currentItem = updatedItem,
                     contextTitle = resolvedContext,
@@ -1556,7 +1564,7 @@ class AppleMusicPlayerManager(
                     isPlaying = effectivePlaying,
                     isBuffering = if (recentToggle && !userIntentPlaying) false else isBuffering,
                     positionMs = cleanPos,
-                    positionUpdatedAtElapsedMs = nowMs,
+                    positionUpdatedAtElapsedMs = updatedAt,
                     durationMs = durationMs.coerceAtLeast(0L),
                     isVideo = if (title.isNotBlank()) isVideo else current.isVideo,
                     isVideoFrameReady = when {
@@ -1574,9 +1582,10 @@ class AppleMusicPlayerManager(
             if (prevTrackIdBeforeSwitch != null && (now - switchStartedAtMs) < 1500L) return
             _state.update { current ->
                 val cleanPos = filterStaleSeekPosition(positionMs, current.positionMs, now)
+                val posChanged = cleanPos != current.positionMs
                 current.copy(
                     positionMs = cleanPos,
-                    positionUpdatedAtElapsedMs = now,
+                    positionUpdatedAtElapsedMs = if (posChanged || !current.isPlaying || current.positionUpdatedAtElapsedMs == 0L) now else current.positionUpdatedAtElapsedMs,
                     durationMs = if (durationMs > 0L) durationMs else current.durationMs
                 )
             }
@@ -2014,9 +2023,9 @@ class AppleMusicPlayerManager(
                       : rawVid;
                     var aud = vid || document.querySelector('audio');
                     var frameReady = !!(isVideo && ((vid && !loading && (vid.readyState >= 2 || vid.videoWidth > 0) && !vid.ended) || (playing && !loading && mk.currentPlaybackTime > 0)));
-                    var rawTimeSec = (mk.currentPlaybackTime && mk.currentPlaybackTime > 0)
-                      ? mk.currentPlaybackTime
-                      : ((aud && typeof aud.currentTime === 'number' && !aud.ended && playing) ? aud.currentTime : (mk.currentPlaybackTime || 0));
+                    var mkTime = (mk.currentPlaybackTime && mk.currentPlaybackTime > 0) ? mk.currentPlaybackTime : 0;
+                    var audTime = (aud && typeof aud.currentTime === 'number' && !aud.ended && !aud.paused && aud.currentTime > 0) ? aud.currentTime : -1;
+                    var rawTimeSec = (playing && audTime > 0 && (mkTime <= 0 || Math.abs(audTime - mkTime) < 1.5)) ? audTime : mkTime;
                     var pos = Math.round(rawTimeSec * 1000);
                     var dur = Math.round((mk.currentPlaybackDuration || 0) * 1000);
                     var pp = attrs.playParams || {};
@@ -2194,7 +2203,15 @@ class AppleMusicPlayerManager(
                   try {
                     if (window.__amSwitchingQueue) return;
                     if (!(mk.isPlaying === true || mk.playbackState === 2)) return;
-                    var pos = Math.round((mk.currentPlaybackTime || 0) * 1000);
+                    var rawVid = document.getElementById('apple-music-video-player') || document.querySelector('video');
+                    var vid = (rawVid && rawVid.tagName !== 'VIDEO' && rawVid.shadowRoot)
+                      ? (rawVid.shadowRoot.querySelector('video') || rawVid)
+                      : rawVid;
+                    var aud = vid || document.querySelector('audio');
+                    var mkTime = (mk.currentPlaybackTime && mk.currentPlaybackTime > 0) ? mk.currentPlaybackTime : 0;
+                    var audTime = (aud && typeof aud.currentTime === 'number' && !aud.ended && !aud.paused && aud.currentTime > 0) ? aud.currentTime : -1;
+                    var tSec = (audTime > 0 && (mkTime <= 0 || Math.abs(audTime - mkTime) < 1.5)) ? audTime : mkTime;
+                    var pos = Math.round(tSec * 1000);
                     if (pos !== window.__amLastPosMs) {
                       window.__amLastPosMs = pos;
                       var dur = Math.round((mk.currentPlaybackDuration || 0) * 1000);

@@ -263,7 +263,7 @@ object TtmlLyricsParser {
             var pendingMainSpace = false
             var pendingBgSpace = false
 
-            fun walk(node: Node, inheritedStart: Long?, inheritedEnd: Long?, inBackground: Boolean) {
+            fun walk(node: Node, inheritedStart: Long?, inheritedEnd: Long?, inBackground: Boolean, fromTimedSpan: Boolean) {
                 when (node.nodeType) {
                     Node.TEXT_NODE, Node.CDATA_SECTION_NODE -> {
                         val rawTxt = node.nodeValue.orEmpty()
@@ -274,7 +274,7 @@ object TtmlLyricsParser {
                             bgTextBuilder.append(collapsed)
                             if (isOnlySpace) {
                                 if (bgWords.isNotEmpty()) pendingBgSpace = true
-                            } else if (inheritedStart != null) {
+                            } else if (fromTimedSpan && inheritedStart != null) {
                                 val wEnd = (inheritedEnd ?: (inheritedStart + 400L)).coerceAtLeast(inheritedStart + 40L)
                                 val prefix = if (pendingBgSpace && !collapsed.startsWith(" ")) " " else ""
                                 pendingBgSpace = false
@@ -284,7 +284,7 @@ object TtmlLyricsParser {
                             textBuilder.append(collapsed)
                             if (isOnlySpace) {
                                 if (words.isNotEmpty()) pendingMainSpace = true
-                            } else if (inheritedStart != null) {
+                            } else if (fromTimedSpan && inheritedStart != null) {
                                 val wEnd = (inheritedEnd ?: (inheritedStart + 400L)).coerceAtLeast(inheritedStart + 40L)
                                 val prefix = if (pendingMainSpace && !collapsed.startsWith(" ")) " " else ""
                                 pendingMainSpace = false
@@ -316,9 +316,10 @@ object TtmlLyricsParser {
                         if (cStart != null && !timingDisabled) hasAnyTiming = true
                         val nextStart = cStart ?: inheritedStart
                         val nextEnd = cEnd ?: inheritedEnd
+                        val childFromTimedSpan = fromTimedSpan || (cStart != null && role != "x-bg")
                         val children = childEl.childNodes
                         for (c in 0 until children.length) {
-                            walk(children.item(c), nextStart, nextEnd, childInBg)
+                            walk(children.item(c), nextStart, nextEnd, childInBg, childFromTimedSpan)
                         }
                     }
                 }
@@ -326,7 +327,7 @@ object TtmlLyricsParser {
 
             val pChildren = el.childNodes
             for (c in 0 until pChildren.length) {
-                walk(pChildren.item(c), rawPStart, rawPEnd, inBackground = false)
+                walk(pChildren.item(c), rawPStart, rawPEnd, inBackground = false, fromTimedSpan = false)
             }
 
             val cleanText = textBuilder.toString()

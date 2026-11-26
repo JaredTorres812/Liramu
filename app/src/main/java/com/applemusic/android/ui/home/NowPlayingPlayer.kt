@@ -2340,7 +2340,12 @@ private fun FullScreenLyricsPage(
 ) {
     val listState = rememberLazyListState()
     val latestPlayback by rememberUpdatedState(playback)
-    var livePositionMs by remember(item.id) { mutableLongStateOf(playback.positionMs) }
+    var livePositionMs by remember(item.id) {
+        val initSince = if (playback.isPlaying && playback.positionUpdatedAtElapsedMs > 0L) {
+            (SystemClock.elapsedRealtime() - playback.positionUpdatedAtElapsedMs).coerceIn(0L, 1200L)
+        } else 0L
+        mutableLongStateOf(playback.positionMs + initSince)
+    }
 
     // Traducción de letras (nativa TTML x-translation o traducción automática al idioma de la app)
     val appStrings = LocalAppStrings.current
@@ -2962,21 +2967,23 @@ private fun LyricLineItem(
         !synced -> 0.92f
         isCurrent -> 1f
         isUserBrowsing -> 0.72f
-        isPast -> 0.26f
-        distance == 1 -> 0.46f
-        else -> 0.32f
+        isPast -> 0.30f
+        distance == 1 -> 0.48f
+        else -> 0.34f
     }
-    val targetScale = if (!synced || isCurrent || isUserBrowsing) 1f else 0.94f
+    val targetScale = if (!synced || isCurrent || isUserBrowsing) 1f else 0.95f
     val alphaState = animateFloatAsState(
         targetValue = targetAlpha,
-        animationSpec = tween(durationMillis = 320),
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
         label = "am_lyric_alpha"
     )
     val scaleState = animateFloatAsState(
         targetValue = targetScale,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
         label = "am_lyric_scale"
     )
+    val mainHasWordTiming = remember(line) { hasRealWordTiming(line.words, line) }
+    val bgHasWordTiming = remember(line) { hasRealWordTiming(line.backgroundWords, line) }
 
     // Column externo: en LazyColumn varios hijos de un mismo ítem se apilan (Box); aquí van uno tras otro.
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -3000,11 +3007,11 @@ private fun LyricLineItem(
         horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
     ) {
         // Misma tipografía en todas las líneas (cero saltos de altura)
-        if (isCurrent && line.words.isNotEmpty()) {
+        if (isCurrent && mainHasWordTiming) {
             LyricSweepText(
                 words = line.words,
                 positionProvider = positionProvider,
-                dimColor = Color.White.copy(alpha = 0.34f),
+                dimColor = Color.White.copy(alpha = 0.46f),
                 litColor = Color.White,
                 fontSize = 29.sp,
                 lineHeight = 37.sp,
@@ -3043,11 +3050,11 @@ private fun LyricLineItem(
         val bgTxt = line.backgroundText
         if (!bgTxt.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
-            if (isCurrent && line.backgroundWords.isNotEmpty()) {
+            if (isCurrent && bgHasWordTiming) {
                 LyricSweepText(
                     words = line.backgroundWords,
                     positionProvider = positionProvider,
-                    dimColor = Color.White.copy(alpha = 0.28f),
+                    dimColor = Color.White.copy(alpha = 0.38f),
                     litColor = Color.White.copy(alpha = 0.88f),
                     fontSize = 19.sp,
                     lineHeight = 25.sp,
@@ -3077,7 +3084,22 @@ private fun LyricLineItem(
     }
 }
 
-/** Texto con barrido palabra a palabra. Solo este composable se recompone con el reloj (a ~25 Hz). */
+/**
+ * `true` solo si [words] trae tiempos reales por palabra/sílaba. Una sola "palabra" con espacios que abarca
+ * toda la línea corresponde a letras sincronizadas únicamente por línea.
+ */
+private fun hasRealWordTiming(
+    words: List<com.applemusic.android.data.model.LyricWord>,
+    line: com.applemusic.android.data.model.LyricLine
+): Boolean {
+    if (words.isEmpty()) return false
+    if (words.size > 1) return true
+    val w = words[0]
+    val spansWholeLine = w.startMs <= line.startMs + 50L && w.endMs >= line.endMs - 50L
+    return !(spansWholeLine && w.text.trim().contains(' '))
+}
+
+/** Texto con barrido palabra a palabra. Solo este composable se recompone con el reloj (~60 Hz). */
 @Composable
 private fun LyricSweepText(
     words: List<com.applemusic.android.data.model.LyricWord>,
@@ -3090,11 +3112,11 @@ private fun LyricSweepText(
     fontWeight: FontWeight,
     textAlign: TextAlign
 ) {
-    val bucket by remember { derivedStateOf { positionProvider() / 40L } }
+    val bucket by remember { derivedStateOf { positionProvider() / 16L } }
     val annotated = remember(words, bucket) {
         buildAppleMusicSweepString(
             words = words,
-            positionMs = bucket * 40L,
+            positionMs = bucket * 16L,
             dimColor = dimColor,
             litColor = litColor
         )
@@ -3136,7 +3158,7 @@ private fun LyricGapDots(
 /**
  * Barrido progresivo de izquierda a derecha estilo Apple Music Sing (sin parpadeos ni sombras que re-maqueten).
  * - Palabras ya cantadas: blanco sólido.
- * - Palabra actual: barrido suave carácter por carácter con borde difuminado de 2 caracteres.
+ * - Palabra actual: barrido suave carácter por carácter con borde difuminado, ignorando espacios iniciales.
  * - Palabras futuras: blanco tenue uniforme.
  */
 private fun buildAppleMusicSweepString(
@@ -3156,15 +3178,20 @@ private fun buildAppleMusicSweepString(
             else -> {
                 val dur = (w.endMs - w.startMs).coerceAtLeast(60L).toFloat()
                 val p = ((positionMs - w.startMs).toFloat() / dur).coerceIn(0f, 1f)
-                val len = w.text.length
+                val firstVisible = w.text.indexOfFirst { !it.isWhitespace() }.let { if (it < 0) 0 else it }
+                if (firstVisible > 0) {
+                    withStyle(SpanStyle(color = litColor)) { append(w.text.substring(0, firstVisible)) }
+                }
+                val visible = w.text.substring(firstVisible)
+                val len = visible.length
                 if (len <= 1) {
-                    withStyle(SpanStyle(color = lerp(dimColor, litColor, p))) { append(w.text) }
+                    withStyle(SpanStyle(color = lerp(dimColor, litColor, p))) { append(visible) }
                 } else {
                     val sweepPos = p * len
                     for (i in 0 until len) {
                         val charP = ((sweepPos - i) / 1.8f + 0.5f).coerceIn(0f, 1f)
                         withStyle(SpanStyle(color = lerp(dimColor, litColor, charP))) {
-                            append(w.text[i])
+                            append(visible[i])
                         }
                     }
                 }
