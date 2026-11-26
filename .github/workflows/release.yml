@@ -1,0 +1,32 @@
+name: Publish Liramu Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release with signed APK
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Liramu ${{ github.ref_name }}"
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true
+          body: |
+            ### Liramu ${{ github.ref_name }} (Beta)
+
+            Descarga directa del APK firmado para Android 8.0+ (teléfono, tablet y Android Auto).
+
+            > **Aviso:** Liramu es un proyecto independiente no afiliado ni relacionado con Apple Inc. Requiere una suscripción activa de Apple Music.
+          files: |
+            releases/*.apk
