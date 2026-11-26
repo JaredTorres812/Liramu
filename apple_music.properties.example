@@ -9,3 +9,8 @@ APPLE_STOREFRONT=mx
 # Optional: leave blank to sign automatically from APPLE_P8_PATH at build time
 APPLE_DEVELOPER_TOKEN=
 APPLE_MUSIC_USER_TOKEN=
+
+# Optional: Chromecast receiver App ID from the Google Cast SDK Developer Console
+# (custom receiver pointing to docs/cast/index.html hosted on GitHub Pages).
+# Leave blank to use Google's Default Media Receiver (TV shows only the cover; audio stays on the phone).
+CAST_RECEIVER_APP_ID=

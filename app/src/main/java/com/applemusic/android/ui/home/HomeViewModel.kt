@@ -26,6 +26,7 @@ import com.applemusic.android.data.settings.AppSettingsUiState
 import com.applemusic.android.playback.AppleMusicPlayerManager
 import com.applemusic.android.playback.AtmosPreferenceMode
 import com.applemusic.android.playback.PlaybackUiState
+import com.applemusic.android.playback.cast.LiramuCastManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -166,6 +167,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         refreshSearchCategories()
         refreshMySocialProfile()
         viewModelScope.launch { settingsManager.trimCachesToLimit() }
+        // Chromecast: la TV sigue la canción actual (audio con MusicKit JS, portada animada y letra en seguimiento).
+        LiramuCastManager.init(application)
+        LiramuCastManager.bind(
+            scope = viewModelScope,
+            playback = playerManager.state,
+            credentials = { tokenManager.getCredentials() },
+            loadLyrics = { item -> runCatching { repository.loadLyrics(item) }.getOrNull() },
+            loadMotionArtwork = { item -> runCatching { repository.loadSongMotionArtwork(item) }.getOrNull() }
+        )
         viewModelScope.launch {
             var lastStationQueried = ""
             playerManager.state.collect { pState ->

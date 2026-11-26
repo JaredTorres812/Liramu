@@ -85,6 +85,7 @@ import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Headset
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
@@ -117,6 +118,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -477,6 +479,7 @@ fun ExpandedNowPlayingScreen(
     }
     val (audioState, audioActions) = rememberAudioOutputController()
     val (refreshAudioDevices, selectAudioRoute) = audioActions
+    val castUi by com.applemusic.android.playback.cast.LiramuCastManager.state.collectAsState()
 
     var draggingValue by remember { mutableFloatStateOf(-1f) }
     var dragAccumulated by remember { mutableFloatStateOf(0f) }
@@ -763,8 +766,8 @@ fun ExpandedNowPlayingScreen(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = audioState.kind.icon,
-                                contentDescription = audioState.deviceName ?: "Conectar dispositivo",
+                                imageVector = if (castUi.isConnected) Icons.Rounded.CastConnected else audioState.kind.icon,
+                                contentDescription = castUi.connectedDeviceName ?: audioState.deviceName ?: "Conectar dispositivo",
                                 modifier = Modifier.size(21.dp)
                             )
                         }
@@ -1764,6 +1767,9 @@ fun ExpandedNowPlayingScreen(
                                 }
                             }
                         }
+
+                        // Chromecast / Google TV: portada (animada si existe) y letra en seguimiento en la TV
+                        CastDevicesSection(cardBg = sheetCardBg, titleTint = titleTint)
                     } else {
                         // Pestaña CONTROLS: solo control de volumen en vivo
                         Surface(
@@ -2962,21 +2968,27 @@ private fun LyricLineItem(
         !synced -> 0.92f
         isCurrent -> 1f
         isUserBrowsing -> 0.72f
-        isPast -> 0.26f
-        distance == 1 -> 0.46f
-        else -> 0.32f
+        isPast -> 0.34f
+        distance == 1 -> 0.5f
+        else -> 0.38f
     }
-    val targetScale = if (!synced || isCurrent || isUserBrowsing) 1f else 0.94f
+    val targetScale = if (!synced || isCurrent || isUserBrowsing) 1f else 0.96f
+    // Transiciones cortas: antes (320 ms + resorte lento) la línea nueva se encendía "con retraso".
     val alphaState = animateFloatAsState(
         targetValue = targetAlpha,
-        animationSpec = tween(durationMillis = 320),
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
         label = "am_lyric_alpha"
     )
     val scaleState = animateFloatAsState(
         targetValue = targetScale,
-        animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow),
+        animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow),
         label = "am_lyric_scale"
     )
+    // Solo hay barrido palabra a palabra si la letra trae tiempos por palabra/sílaba. Con letras sincronizadas
+    // por línea el parser deja UNA "palabra" con toda la línea y el barrido se arrastraba letra por letra
+    // durante toda la línea (efecto de retraso, texto medio apagado e ilegible).
+    val mainHasWordTiming = remember(line) { hasRealWordTiming(line.words, line) }
+    val bgHasWordTiming = remember(line) { hasRealWordTiming(line.backgroundWords, line) }
 
     // Column externo: en LazyColumn varios hijos de un mismo ítem se apilan (Box); aquí van uno tras otro.
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -3000,11 +3012,11 @@ private fun LyricLineItem(
         horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start
     ) {
         // Misma tipografía en todas las líneas (cero saltos de altura)
-        if (isCurrent && line.words.isNotEmpty()) {
+        if (isCurrent && mainHasWordTiming) {
             LyricSweepText(
                 words = line.words,
                 positionProvider = positionProvider,
-                dimColor = Color.White.copy(alpha = 0.34f),
+                dimColor = Color.White.copy(alpha = 0.5f),
                 litColor = Color.White,
                 fontSize = 29.sp,
                 lineHeight = 37.sp,
@@ -3043,11 +3055,11 @@ private fun LyricLineItem(
         val bgTxt = line.backgroundText
         if (!bgTxt.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
-            if (isCurrent && line.backgroundWords.isNotEmpty()) {
+            if (isCurrent && bgHasWordTiming) {
                 LyricSweepText(
                     words = line.backgroundWords,
                     positionProvider = positionProvider,
-                    dimColor = Color.White.copy(alpha = 0.28f),
+                    dimColor = Color.White.copy(alpha = 0.42f),
                     litColor = Color.White.copy(alpha = 0.88f),
                     fontSize = 19.sp,
                     lineHeight = 25.sp,
@@ -3077,6 +3089,21 @@ private fun LyricLineItem(
     }
 }
 
+/**
+ * `true` si [words] trae tiempos reales por palabra/sílaba. Una sola "palabra" que contiene espacios y
+ * dura lo mismo que la línea es en realidad la línea completa (letra sincronizada solo por línea).
+ */
+private fun hasRealWordTiming(
+    words: List<com.applemusic.android.data.model.LyricWord>,
+    line: com.applemusic.android.data.model.LyricLine
+): Boolean {
+    if (words.isEmpty()) return false
+    if (words.size > 1) return true
+    val w = words[0]
+    val spansWholeLine = w.startMs <= line.startMs + 50L && w.endMs >= line.endMs - 50L
+    return !(spansWholeLine && w.text.trim().contains(' '))
+}
+
 /** Texto con barrido palabra a palabra. Solo este composable se recompone con el reloj (a ~25 Hz). */
 @Composable
 private fun LyricSweepText(
@@ -3090,11 +3117,12 @@ private fun LyricSweepText(
     fontWeight: FontWeight,
     textAlign: TextAlign
 ) {
-    val bucket by remember { derivedStateOf { positionProvider() / 40L } }
+    // ~60 Hz: con 40 ms el barrido avanzaba a saltos y se veía rezagado respecto a la voz.
+    val bucket by remember { derivedStateOf { positionProvider() / 16L } }
     val annotated = remember(words, bucket) {
         buildAppleMusicSweepString(
             words = words,
-            positionMs = bucket * 40L,
+            positionMs = bucket * 16L,
             dimColor = dimColor,
             litColor = litColor
         )

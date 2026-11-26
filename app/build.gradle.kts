@@ -87,6 +87,8 @@ android {
         buildConfigField("String", "APPLE_DEVELOPER_TOKEN", "\"${escapeBuildConfig(developerToken)}\"")
         buildConfigField("String", "APPLE_MUSIC_USER_TOKEN", "\"${escapeBuildConfig(prop("APPLE_MUSIC_USER_TOKEN"))}\"")
         buildConfigField("String", "APPLE_STOREFRONT", "\"${escapeBuildConfig(prop("APPLE_STOREFRONT", "mx"))}\"")
+        // ID de la app receptora de Chromecast (Google Cast SDK Developer Console). Vacío = Default Media Receiver.
+        buildConfigField("String", "CAST_RECEIVER_APP_ID", "\"${escapeBuildConfig(prop("CAST_RECEIVER_APP_ID"))}\"")
     }
 
     signingConfigs {
@@ -161,6 +163,8 @@ dependencies {
     implementation(libs.haze)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.hls)
+    implementation(libs.play.services.cast.framework)
+    implementation(libs.androidx.mediarouter)
 
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)

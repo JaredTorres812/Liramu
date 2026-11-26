@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liramu Cast</title>
+<!--
+  Receptor de Chromecast de Liramu.
+  - Reproduce la canción actual con MusicKit JS (si el teléfono manda token de desarrollador + Music User Token).
+  - Muestra la portada (animada si Apple Music la tiene) y la letra sincronizada en seguimiento.
+  - Si no puede reproducir audio, queda en modo "pantalla" y sigue el reloj que manda el teléfono.
+  Publícalo con GitHub Pages (carpeta /docs) y registra la URL como "Custom Receiver" en la
+  Google Cast SDK Developer Console. El ID que te den va en CAST_RECEIVER_APP_ID.
+-->
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+<script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" data-web-components async></script>
+<style>
+  :root { --accent: #ffffff; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0d0f; color: #fff;
+    font-family: "Google Sans", "Product Sans", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+  #bg { position: fixed; inset: -10%; background-size: cover; background-position: center;
+    filter: blur(70px) saturate(1.4) brightness(0.55); transform: scale(1.1); transition: background-image 0.8s; }
+  #bgShade { position: fixed; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.35), rgba(0,0,0,.55)); }
+
+  #stage { position: relative; z-index: 1; display: flex; height: 100%; padding: 6vh 5vw; gap: 5vw; align-items: center; }
+  #left { flex: 0 0 38%; display: flex; flex-direction: column; justify-content: center; transition: all .6s ease; }
+  body.noLyrics #left { flex: 1 1 auto; align-items: center; text-align: center; }
+  #cover { position: relative; width: min(38vw, 64vh); aspect-ratio: 1; border-radius: 22px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0,0,0,.55); background: #222; }
+  body.noLyrics #cover { width: min(46vw, 62vh); }
+  #cover img, #cover video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  #cover video { opacity: 0; transition: opacity .8s; }
+  #cover video.ready { opacity: 1; }
+  #title { margin-top: 4vh; font-size: 4.2vh; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #artist { margin-top: .8vh; font-size: 3vh; font-weight: 600; opacity: .72;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #progress { margin-top: 3vh; width: min(38vw, 64vh); height: 6px; border-radius: 3px; background: rgba(255,255,255,.22); overflow: hidden; }
+  body.noLyrics #progress { width: min(46vw, 62vh); }
+  #progressFill { height: 100%; width: 0; background: #fff; border-radius: 3px; }
+  #times { width: min(38vw, 64vh); display: flex; justify-content: space-between; margin-top: 1vh; font-size: 2vh; opacity: .65;
+    font-variant-numeric: tabular-nums; }
+  body.noLyrics #times { width: min(46vw, 62vh); }
+  #badge { margin-top: 2vh; font-size: 1.8vh; font-weight: 600; opacity: .55; }
+
+  #right { flex: 1 1 auto; height: 100%; position: relative; overflow: hidden;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 78%, transparent 100%);
+            mask-image: linear-gradient(180deg, transparent 0%, #000 14%, #000 78%, transparent 100%); }
+  body.noLyrics #right { display: none; }
+  #lyrics { position: absolute; left: 0; right: 0; top: 0; will-change: transform;
+    transition: transform .55s cubic-bezier(.2,.7,.2,1); padding-right: 2vw; }
+  .line { font-size: 5.2vh; line-height: 1.22; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 3.6vh;
+    color: rgba(255,255,255,.38); transition: color .18s ease, transform .3s ease; transform-origin: left center; transform: scale(.96); }
+  .line.sec { text-align: right; transform-origin: right center; }
+  .line.past { color: rgba(255,255,255,.30); }
+  .line.active { color: #fff; transform: scale(1); }
+  .line.unsynced { color: rgba(255,255,255,.9); transform: none; }
+  .line .bg { display: block; font-size: 3.2vh; font-weight: 700; margin-top: .8vh; opacity: .85; }
+  .line .tr { display: block; font-size: 2.7vh; font-weight: 600; margin-top: .8vh; opacity: .7; }
+  /* Barrido palabra a palabra: solo en la línea activa y solo si hay tiempos por palabra */
+  .line.active.words .w { color: transparent; -webkit-background-clip: text; background-clip: text;
+    background-image: linear-gradient(90deg, #fff var(--p, 0%), rgba(255,255,255,.5) calc(var(--p, 0%) + 6%)); }
+  .dots { display: flex; gap: 1.6vh; margin-bottom: 3.6vh; height: 5.2vh; align-items: center; }
+  .dots i { width: 1.6vh; height: 1.6vh; border-radius: 50%; background: #fff; opacity: .3; transition: opacity .2s, transform .2s; }
+  .credit { font-size: 2vh; opacity: .5; margin-top: 4vh; }
+
+  #idle { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #0d0d0f; transition: opacity .6s; gap: 2vh; }
+  #idle.hidden { opacity: 0; pointer-events: none; }
+  #idle h1 { font-size: 7vh; font-weight: 800; letter-spacing: -0.03em; }
+  #idle p { font-size: 2.6vh; opacity: .6; }
+</style>
+</head>
+<body class="noLyrics">
+<div id="bg"></div><div id="bgShade"></div>
+<div id="stage">
+  <div id="left">
+    <div id="cover"><img id="coverImg" alt=""><video id="coverVideo" muted loop playsinline></video></div>
+    <div id="title"></div>
+    <div id="artist"></div>
+    <div id="progress"><div id="progressFill"></div></div>
+    <div id="times"><span id="tCur">0:00</span><span id="tDur">0:00</span></div>
+    <div id="badge"></div>
+  </div>
+  <div id="right"><div id="lyrics"></div></div>
+</div>
+<div id="idle"><h1>Liramu</h1><p>Elige una canción en tu teléfono</p></div>
+
+<script>
+(function () {
+  'use strict';
+  var NS = 'urn:x-cast:com.liramu.cast';
+  var context = cast.framework.CastReceiverContext.getInstance();
+
+  var $ = function (id) { return document.getElementById(id); };
+  var els = {
+    bg: $('bg'), coverImg: $('coverImg'), coverVideo: $('coverVideo'), title: $('title'), artist: $('artist'),
+    fill: $('progressFill'), tCur: $('tCur'), tDur: $('tDur'), badge: $('badge'), lyrics: $('lyrics'),
+    right: $('right'), idle: $('idle')
+  };
+
+  // ------------------------------------------------------------------ estado
+  var auth = { developerToken: '', musicUserToken: '', storefront: 'us' };
+  var music = null;          // instancia de MusicKit (solo si hay tokens válidos)
+  var tvAudio = false;       // la TV está reproduciendo el audio
+  var track = null;          // { id, catalogId, title, artist, artworkUrl, motionUrl }
+  var lyrics = null;         // { synced, lines:[{s,e,t,w,bg,bw,sec,tr}], songwriter }
+  var durationMs = 0;
+  var clock = { pos: 0, at: performance.now(), playing: false }; // reloj que manda el teléfono
+  var lineEls = [];
+  var activeIdx = -2;
+  var hls = null;
+  var loadedQueueId = null;
+
+  function send(obj) {
+    try { context.sendCustomMessage(NS, undefined, obj); } catch (e) { /* sin emisores */ }
+  }
+  function setTvAudio(v) {
+    tvAudio = !!v;
+    els.badge.textContent = tvAudio ? 'Reproduciendo en esta TV' : 'Audio en el teléfono';
+    send({ type: 'status', audio: tvAudio });
+  }
+
+  // ------------------------------------------------------------------ MusicKit
+  function decodeJwtPart(tok, idx) {
+    try {
+      var b = tok.split('.')[idx].replace(/-/g, '+').replace(/_/g, '/');
+      while (b.length % 4) b += '=';
+      return JSON.parse(atob(b));
+    } catch (e) { return {}; }
+  }
+
+  function waitForMusicKit() {
+    return new Promise(function (resolve, reject) {
+      if (window.MusicKit && MusicKit.configure) return resolve();
+      var done = false;
+      document.addEventListener('musickitloaded', function () { if (!done) { done = true; resolve(); } });
+      setTimeout(function () { if (!done) { done = true; reject(new Error('MusicKit no cargó')); } }, 15000);
+    });
+  }
+
+  function setupMusicKit() {
+    if (!auth.developerToken || !auth.musicUserToken) { music = null; setTvAudio(false); return Promise.resolve(); }
+    // MusicKit JS guarda el Music User Token en localStorage; lo precargamos con las claves que usa.
+    try {
+      var h = decodeJwtPart(auth.developerToken, 0), p = decodeJwtPart(auth.developerToken, 1);
+      [p.iss, h.kid, (p.iss || '').toLowerCase()].forEach(function (k) {
+        if (!k) return;
+        localStorage.setItem('music.' + k + '.u', auth.musicUserToken);
+        localStorage.setItem('music.' + k + '.media-user-token', auth.musicUserToken);
+      });
+    } catch (e) {}
+    return waitForMusicKit().then(function () {
+      return MusicKit.configure({
+        developerToken: auth.developerToken,
+        app: { name: 'Liramu', build: '1.0.0' },
+        storefrontId: auth.storefront || 'us'
+      });
+    }).then(function (instance) {
+      music = instance || MusicKit.getInstance();
+      if (!music.isAuthorized) { try { music.musicUserToken = auth.musicUserToken; } catch (e) {} }
+      if (!music.isAuthorized) { music = null; setTvAudio(false); return; }
+      music.volume = 1;
+      music.addEventListener('playbackStateDidChange', function () {
+        var st = music.playbackState;
+        if (st === MusicKit.PlaybackStates.playing && !tvAudio) setTvAudio(true);
+      });
+      music.addEventListener('mediaPlaybackError', function () { stopTvAudio(); });
+      if (track) playOnTv();
+    }).catch(function (err) {
+      console.warn('MusicKit', err);
+      music = null;
+      setTvAudio(false);
+    });
+  }
+
+  function stopTvAudio() {
+    if (music) { try { music.stop(); } catch (e) {} }
+    loadedQueueId = null;
+    setTvAudio(false);
+  }
+
+  function isAudioTrack(t) {
+    var type = (t.type || '').toLowerCase();
+    return type.indexOf('video') < 0 && type.indexOf('station') < 0 && (t.id || '').indexOf('ra.') !== 0;
+  }
+
+  function playOnTv() {
+    if (!music || !track) return;
+    if (!isAudioTrack(track)) { stopTvAudio(); return; }
+    var id = track.catalogId || track.id;
+    if (!/^\d+$/.test(id)) { stopTvAudio(); return; } // ids de biblioteca (i.xxx) no se pueden encolar aquí
+    if (loadedQueueId === id) return;
+    loadedQueueId = id;
+    music.setQueue({ song: id, startPlaying: false }).then(function () {
+      if (loadedQueueId !== id) return;
+      var target = phonePos() / 1000;
+      var p = target > 1 ? music.seekToTime(target) : Promise.resolve();
+      return Promise.resolve(p).then(function () { if (clock.playing) return music.play(); });
+    }).catch(function (err) {
+      console.warn('setQueue', err);
+      if (loadedQueueId === id) stopTvAudio();
+    });
+  }
+
+  function alignTvAudio() {
+    if (!music || !tvAudio || !track || loadedQueueId !== (track.catalogId || track.id)) return;
+    var playing = music.playbackState === MusicKit.PlaybackStates.playing;
+    if (clock.playing && !playing) { music.play().catch(function () {}); }
+    if (!clock.playing && playing) { music.pause(); }
+    var drift = phonePos() - music.currentPlaybackTime * 1000;
+    if (Math.abs(drift) > 2500) { music.seekToTime(phonePos() / 1000).catch(function () {}); }
+  }
+
+  // ------------------------------------------------------------------ reloj
+  function phonePos() {
+    var pos = clock.pos + (clock.playing ? performance.now() - clock.at : 0);
+    return durationMs > 0 ? Math.min(pos, durationMs) : pos;
+  }
+  function nowPos() {
+    if (music && tvAudio && track && loadedQueueId === (track.catalogId || track.id)) {
+      return music.currentPlaybackTime * 1000;
+    }
+    return phonePos();
+  }
+  function setClock(pos, playing) {
+    // Corrección suave: si la diferencia es pequeña no saltamos (evita tirones en la letra).
+    var current = phonePos();
+    var target = pos;
+    if (clock.playing && playing && Math.abs(target - current) < 350) target = current + (target - current) * 0.35;
+    clock.pos = target; clock.at = performance.now(); clock.playing = playing;
+  }
+
+  // ------------------------------------------------------------------ portada
+  function setArtwork(t) {
+    var art = t.artworkUrl || '';
+    if (els.coverImg.getAttribute('src') !== art) {
+      els.coverImg.src = art;
+      els.bg.style.backgroundImage = art ? 'url("' + art + '")' : 'none';
+    }
+    var motion = t.motionUrl || '';
+    if (els.coverVideo.dataset.src === motion) return;
+    els.coverVideo.dataset.src = motion;
+    els.coverVideo.classList.remove('ready');
+    if (hls) { hls.destroy(); hls = null; }
+    els.coverVideo.removeAttribute('src');
+    if (!motion) return;
+    var onReady = function () { els.coverVideo.classList.add('ready'); };
+    els.coverVideo.onplaying = onReady;
+    if (window.Hls && Hls.isSupported()) {
+      hls = new Hls({ capLevelToPlayerSize: true, maxBufferLength: 20 });
+      hls.loadSource(motion);
+      hls.attachMedia(els.coverVideo);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () { els.coverVideo.play().catch(function () {}); });
+      hls.on(Hls.Events.ERROR, function (_, data) {
+        if (data && data.fatal) { hls.destroy(); hls = null; els.coverVideo.classList.remove('ready'); }
+      });
+    } else if (els.coverVideo.canPlayType('application/vnd.apple.mpegurl')) {
+      els.coverVideo.src = motion;
+      els.coverVideo.play().catch(function () {});
+    }
+  }
+
+  // ------------------------------------------------------------------ letra
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function wordsHtml(words) {
+    return words.map(function (w, i) { return '<span class="w" data-i="' + i + '">' + esc(w[2]) + '</span>'; }).join('');
+  }
+
+  function renderLyrics() {
+    lineEls = []; activeIdx = -2;
+    els.lyrics.style.transform = 'translateY(0)';
+    if (!lyrics || !lyrics.lines || !lyrics.lines.length) {
+      els.lyrics.innerHTML = '';
+      document.body.classList.add('noLyrics');
+      return;
+    }
+    document.body.classList.remove('noLyrics');
+    var html = '';
+    var first = lyrics.lines[0];
+    if (lyrics.synced && first.s >= 4500) html += '<div class="dots" id="introDots"><i></i><i></i><i></i></div>';
+    lyrics.lines.forEach(function (l, i) {
+      var cls = 'line' + (l.sec ? ' sec' : '') + (lyrics.synced ? '' : ' unsynced') + (l.w ? ' words' : '');
+      var main = l.w ? wordsHtml(l.w) : esc(l.t);
+      var bg = l.bg ? '<span class="bg">' + (l.bw ? wordsHtml(l.bw) : esc(l.bg)) + '</span>' : '';
+      var tr = l.tr ? '<span class="tr">' + esc(l.tr) + '</span>' : '';
+      html += '<div class="' + cls + '" data-i="' + i + '">' + main + bg + tr + '</div>';
+    });
+    if (lyrics.songwriter) html += '<div class="credit">Escrita por: ' + esc(lyrics.songwriter) + '</div>';
+    els.lyrics.innerHTML = html;
+    lineEls = Array.prototype.slice.call(els.lyrics.querySelectorAll('.line'));
+  }
+
+  function findActive(pos) {
+    var lines = lyrics.lines, lo = 0, hi = lines.length - 1, last = -1;
+    while (lo <= hi) { var mid = (lo + hi) >> 1; if (lines[mid].s <= pos) { last = mid; lo = mid + 1; } else hi = mid - 1; }
+    if (last < 0) return -1;
+    for (var i = last, n = 0; i >= 0 && n < 6; i--, n++) if (pos <= lines[i].e) return i;
+    return last;
+  }
+
+  function scrollTo(idx) {
+    var el = idx >= 0 ? lineEls[idx] : null;
+    var anchor = els.right.clientHeight * 0.32;
+    var y = el ? el.offsetTop - anchor : 0;
+    els.lyrics.style.transform = 'translateY(' + (-Math.max(0, y)) + 'px)';
+  }
+
+  function sweep(lineEl, words, pos, selector) {
+    var spans = selector ? lineEl.querySelectorAll(selector) : lineEl.children;
+    for (var i = 0; i < words.length && i < spans.length; i++) {
+      var w = words[i], p;
+      if (pos >= w[1]) p = 100; else if (pos <= w[0]) p = 0; else p = ((pos - w[0]) / Math.max(60, w[1] - w[0])) * 100;
+      spans[i].style.setProperty('--p', p.toFixed(1) + '%');
+    }
+  }
+
+  function updateLyrics(pos) {
+    if (!lyrics || !lyrics.synced || !lineEls.length) return;
+    var idx = findActive(pos);
+    if (idx !== activeIdx) {
+      if (activeIdx >= 0 && lineEls[activeIdx]) lineEls[activeIdx].classList.remove('active');
+      lineEls.forEach(function (el, i) { el.classList.toggle('past', idx >= 0 && i < idx); });
+      if (idx >= 0) lineEls[idx].classList.add('active');
+      activeIdx = idx;
+      scrollTo(idx);
+    }
+    var intro = document.getElementById('introDots');
+    if (intro) {
+      var first = lyrics.lines[0].s, prog = Math.max(0, Math.min(1, pos / first));
+      intro.style.display = pos < first ? 'flex' : 'none';
+      Array.prototype.forEach.call(intro.children, function (d, i) {
+        var lp = Math.max(0, Math.min(1, (prog - i / 3) * 3));
+        d.style.opacity = (0.3 + 0.7 * lp).toFixed(2);
+        d.style.transform = 'scale(' + (0.75 + 0.4 * lp).toFixed(2) + ')';
+      });
+    }
+    if (idx >= 0) {
+      var l = lyrics.lines[idx], el = lineEls[idx];
+      if (l.w) sweep(el, l.w, pos, ':scope > .w');
+      if (l.bw) sweep(el, l.bw, pos, '.bg > .w');
+    }
+  }
+
+  // ------------------------------------------------------------------ bucle de dibujo
+  function fmt(ms) {
+    if (!(ms > 0)) return '0:00';
+    var s = Math.floor(ms / 1000);
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+  var lastTimeText = '';
+  function frame() {
+    if (track) {
+      var pos = nowPos();
+      updateLyrics(pos);
+      var dur = durationMs || (music && tvAudio ? music.currentPlaybackDuration * 1000 : 0);
+      if (dur > 0) els.fill.style.width = Math.min(100, pos / dur * 100).toFixed(2) + '%';
+      var tt = fmt(pos) + '|' + fmt(dur);
+      if (tt !== lastTimeText) { lastTimeText = tt; els.tCur.textContent = fmt(pos); els.tDur.textContent = fmt(dur); }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ------------------------------------------------------------------ mensajes del teléfono
+  function onMessage(msg) {
+    if (!msg || typeof msg !== 'object') return;
+    switch (msg.type) {
+      case 'hello':
+        var changed = msg.developerToken !== auth.developerToken || msg.musicUserToken !== auth.musicUserToken;
+        auth = { developerToken: msg.developerToken || '', musicUserToken: msg.musicUserToken || '', storefront: msg.storefront || 'us' };
+        if (changed || !music) setupMusicKit(); else send({ type: 'status', audio: tvAudio });
+        break;
+      case 'load':
+        var t = msg.track || {};
+        var sameTrack = track && track.id === t.id && track.catalogId === t.catalogId;
+        track = t;
+        durationMs = msg.durationMs || 0;
+        setClock(msg.positionMs || 0, !!msg.isPlaying);
+        els.idle.classList.add('hidden');
+        els.title.textContent = t.title || '';
+        els.artist.textContent = t.artist || '';
+        setArtwork(t);
+        if (!sameTrack || msg.lyrics) { lyrics = msg.lyrics || (sameTrack ? lyrics : null); renderLyrics(); }
+        if (!sameTrack) { if (music) playOnTv(); else setTvAudio(false); }
+        break;
+      case 'sync':
+        if (msg.durationMs > 0) durationMs = msg.durationMs;
+        setClock(msg.positionMs || 0, !!msg.isPlaying);
+        alignTvAudio();
+        break;
+      case 'stop':
+        stopTvAudio();
+        break;
+    }
+  }
+
+  context.addCustomMessageListener(NS, function (event) {
+    var data = event.data;
+    if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { return; } }
+    onMessage(data);
+  });
+  context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, function () {
+    send({ type: 'hello' });
+  });
+  context.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, function () {
+    if (context.getSenders().length === 0) { stopTvAudio(); context.stop(); }
+  });
+
+  var options = new cast.framework.CastReceiverOptions();
+  options.disableIdleTimeout = true;
+  options.skipPlayersLoad = true;
+  options.customNamespaces = {};
+  options.customNamespaces[NS] = cast.framework.system.MessageType.JSON;
+  context.start(options);
+})();
+</script>
+</body>
+</html>

@@ -51,8 +51,29 @@
   - **Fijados (Pins)** arriba de la biblioteca sincronizados con tu cuenta.
   - Sincronización automática de **Artistas favoritos (★)** y **Escuchado recientemente**.
 - **Apple Music Replay (Material 3 Expressive):** Resúmenes anuales y mensuales rediseñados con tarjetas Bento, podio #1 y géneros principales.
+- **Chromecast / Google TV:** Desde *Conectar dispositivo* en el reproductor. La TV muestra la portada (animada si existe) y la letra en seguimiento; con receptor propio también reproduce el audio.
 - **Android Auto:** Soporte integrado mediante `MediaBrowserService` con portada HD, controles del volante y cola de reproducción.
 - **Bilingüe:** Interfaz completa en **Español** e **English**.
+
+---
+
+## Chromecast (receptor propio)
+
+Apple Music protege el audio con DRM, así que no se puede enviar el stream del teléfono a la TV tal cual. Liramu usa un **receptor propio** (`docs/cast/index.html`) que corre en el Chromecast:
+
+- Reproduce la misma canción con **MusicKit JS** y se mantiene sincronizado con el teléfono (el teléfono queda en silencio como control remoto: cola, siguiente, pausa, etc.).
+- Muestra la **portada animada** (o la fija) y la **letra sincronizada palabra por palabra**.
+- Si la TV no puede reproducir el audio (por ejemplo, sin token de desarrollador propio), queda en **modo pantalla**: portada + letra en la TV y el audio sigue en el teléfono.
+
+Para activarlo:
+
+1. Activa **GitHub Pages** en este repositorio (*Settings → Pages → Branch: `main`, carpeta `/docs`*). El receptor queda en `https://<usuario>.github.io/Liramu/cast/`.
+2. En la [Google Cast SDK Developer Console](https://cast.google.com/publish) crea una app **Custom Receiver** con esa URL y registra tu Chromecast para pruebas (o publica la app).
+3. Pon el *Application ID* en `apple_music.properties` → `CAST_RECEIVER_APP_ID=XXXXXXXX` y vuelve a compilar.
+
+Sin `CAST_RECEIVER_APP_ID` se usa el receptor genérico de Google: la TV solo muestra la portada y el audio sigue en el teléfono.
+
+> La reproducción en la TV necesita el token de desarrollador propio (`APPLE_TEAM_ID` / `APPLE_KEY_ID` / `.p8`) y el Music User Token; el token web de music.apple.com solo funciona en ese dominio.
 
 ---
 
