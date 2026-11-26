@@ -89,9 +89,30 @@ android {
         buildConfigField("String", "APPLE_STOREFRONT", "\"${escapeBuildConfig(prop("APPLE_STOREFRONT", "mx"))}\"")
     }
 
+    signingConfigs {
+        val ksPropsFile = rootProject.file("keystore.properties")
+        if (ksPropsFile.exists()) {
+            val ksProps = Properties().apply { ksPropsFile.inputStream().use { load(it) } }
+            val storePath = ksProps.getProperty("storeFile", "").trim()
+            val storeFileObj = rootProject.file(storePath)
+            if (storePath.isNotBlank() && storeFileObj.exists()) {
+                create("release") {
+                    storeFile = storeFileObj
+                    storePassword = ksProps.getProperty("storePassword", "")
+                    keyAlias = ksProps.getProperty("keyAlias", "")
+                    keyPassword = ksProps.getProperty("keyPassword", "")
+                    enableV1Signing = true
+                    enableV2Signing = true
+                    enableV3Signing = true
+                }
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

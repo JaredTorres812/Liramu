@@ -22,6 +22,7 @@ google-services.json
 *.jks
 *.keystore
 
-# Build artifacts
+# Build artifacts (allow signed release APKs in releases/)
 *.apk
+!releases/*.apk
 *.aab

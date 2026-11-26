@@ -9,6 +9,12 @@
   <em>A modern Material 3 Expressive Apple Music client for Android (Phone, Tablet & Android Auto)</em>
 </p>
 
+<p align="center">
+  <a href="https://github.com/Jeztorres/Liramu/raw/main/releases/Liramu-v1.0.0-beta.apk">
+    <img src="https://img.shields.io/badge/Descargar%20APK-Liramu%20v1.0.0--beta-FF3B6B?style=for-the-badge&logo=android&logoColor=white" alt="Descargar Liramu APK" />
+  </a>
+</p>
+
 ---
 
 > [!IMPORTANT]
@@ -16,6 +22,14 @@
 > - **Liramu es un proyecto independiente y NO está afiliado, asociado, patrocinado ni relacionado de ninguna manera con Apple Inc. ni con Apple Music.**
 > - **Requiere una suscripción activa de Apple Music** para iniciar sesión, acceder a tu biblioteca y reproducir música o videos completos.
 > - **Estado Beta:** El proyecto se encuentra actualmente en **fase Beta**. Puede presentar detalles por pulir; ¡esperamos que les agrade el proyecto y cualquier sugerencia o reporte es bienvenido!
+
+---
+
+## Descarga e instalación
+
+1. Descarga el APK firmado más reciente: **[Liramu-v1.0.0-beta.apk](https://github.com/Jeztorres/Liramu/raw/main/releases/Liramu-v1.0.0-beta.apk)** (Android 8.0+ / API 26+).
+2. Abre el archivo en tu teléfono o tablet Android y acepta la instalación.
+   > *Nota:* Al instalarse fuera de Google Play Store, Android puede pedirte permiso para instalar apps de fuentes externas (o tocar **"Más detalles → Instalar de todos modos"** si aparece Play Protect). El APK está firmado con clave de lanzamiento oficial de Liramu para garantizar integridad y actualizaciones limpias.
 
 ---
 
@@ -42,26 +56,6 @@
 
 ---
 
-## Cómo compilar
+## Comunidad
 
-1. Clona este repositorio:
-   ```bash
-   git clone https://github.com/Jeztorres/Liramu.git
-   cd Liramu
-   ```
-2. Copia `apple_music.properties.example` a `apple_music.properties` y configura tus credenciales de Apple Music (si deseas usar el SDK nativo) o déjalo con tu storefront por defecto (`mx`, `us`, etc.):
-   ```bash
-   cp apple_music.properties.example apple_music.properties
-   ```
-   > `apple_music.properties` y cualquier archivo `.p8` están bloqueados en `.gitignore` para proteger tus llaves.
-3. Compila con **JDK 21**:
-   ```bash
-   ./gradlew assembleDebug
-   ```
-
----
-
-## Créditos y Comunidad
-
-Proyecto desarrollado con Kotlin, Jetpack Compose y Material 3 Expressive.  
-**¡Esperamos que les agrade Liramu!** Si encuentras un error o tienes una idea de mejora, abre un *Issue* o *Pull Request*.
+**¡Esperamos que les agrade Liramu!** Si encuentras un error o tienes una idea de mejora, abre un *Issue* en este repositorio.
