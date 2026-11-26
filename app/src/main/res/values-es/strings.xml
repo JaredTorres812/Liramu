@@ -1,0 +1,95 @@
+<resources>
+    <string name="app_name">Liramu</string>
+    <!-- Inicio -->
+    <string name="home_title">Inicio</string>
+    <string name="filter_all">Todo</string>
+    <string name="filter_for_you">Para ti</string>
+    <string name="filter_recent">Recientes</string>
+    <string name="filter_charts">Éxitos</string>
+    <string name="action_refresh">Actualizar</string>
+    <string name="account_tokens">Cuenta y tokens</string>
+    <string name="web_session_title">Inicio completo</string>
+    <string name="web_session_desc">Inicia sesión una vez con tu Apple ID para traer todo tu Inicio (Replay, Conciertos, Amigos…).</string>
+    <string name="action_connect">Conectar</string>
+    <string name="banner_demo_title">Vista previa</string>
+    <string name="banner_catalog_title">Modo catálogo de Apple Music</string>
+    <string name="banner_connected">Conectado</string>
+    <string name="banner_demo_desc">Configura tu Team ID, Key ID y .p8 para habilitar el inicio de sesión.</string>
+    <string name="banner_catalog_desc">Inicia sesión con tu cuenta de Apple Music para ver tu Inicio personalizado.</string>
+    <string name="action_sign_in">Iniciar sesión</string>
+    <string name="action_configure">Configurar</string>
+    <string name="action_play">Reproducir</string>
+    <string name="action_pause">Pausar</string>
+    <string name="action_shuffle">Aleatorio</string>
+    <string name="loading_music">Cargando tu música…</string>
+    <string name="error_home">No se pudo cargar el Inicio</string>
+    <string name="action_retry">Reintentar</string>
+    <string name="action_check_tokens">Revisar tokens</string>
+    <string name="action_back">Volver</string>
+    <string name="action_close">Cerrar</string>
+    <string name="action_clear">Limpiar</string>
+    <string name="action_save_load">Guardar y cargar</string>
+    <string name="web_login_done">Listo, volver al Inicio</string>
+    <string name="coming_soon">Próximamente</string>
+
+    <!-- Álbum -->
+    <string name="album_error">No se pudo cargar el álbum</string>
+    <string name="album_disc">Disco %1$d</string>
+    <string name="album_summary">%1$d canciones, %2$d minutos</string>
+
+    <!-- Pestañas -->
+    <string name="tab_home">Inicio</string>
+    <string name="tab_new">Novedades</string>
+    <string name="tab_radio">Radio</string>
+    <string name="tab_library">Biblioteca</string>
+    <string name="tab_search">Buscar</string>
+
+    <!-- Configuración -->
+    <string name="setup_title">Configuración de Apple Music API</string>
+    <string name="setup_personalized">Conectado: Inicio personalizado activo</string>
+    <string name="setup_catalog">Conectado: solo catálogo (falta Music User Token)</string>
+    <string name="setup_demo">Modo demo: configura tus llaves de Apple Developer</string>
+    <string name="setup_switch_account">Cambiar cuenta / Volver a iniciar sesión con Apple Music</string>
+    <string name="setup_sign_in_apple_music">Iniciar sesión con Apple Music</string>
+    <string name="setup_use_p8">Usar .p8 + Team/Key ID</string>
+    <string name="setup_paste_jwt">Pegar JWT directo</string>
+    <string name="setup_team_id">Team ID (10 caracteres)</string>
+    <string name="setup_key_id">Key ID (10 caracteres)</string>
+    <string name="setup_p8_content">Contenido del archivo .p8</string>
+    <string name="setup_dev_token">Developer Token (JWT)</string>
+    <string name="setup_user_token">Music User Token (opcional para catálogo, necesario para Inicio)</string>
+    <string name="setup_storefront">Storefront (ej. mx, us, es)</string>
+
+    <!-- Mensajes -->
+    <string name="error_api">Error al conectar con Apple Music API</string>
+    <string name="error_dev_token">Error al generar el Developer Token</string>
+    <string name="signed_in_storefront">Sesión iniciada con Apple Music (%1$s).</string>
+    <string name="signed_in">Sesión iniciada con Apple Music.</string>
+    <string name="auth_title">Iniciar sesión con Apple</string>
+    <string name="auth_opening">Abriendo Apple ID…</string>
+    <string name="auth_no_token">No se recibió el Music User Token.</string>
+    <string name="auth_error">Error al autorizar con Apple Music.</string>
+    <string name="mk_start_message">Conecta tu cuenta de Apple Music para ver tu Inicio personalizado y reproducir música.</string>
+    <string name="mk_no_token">No se recibió Music User Token de Apple Music.</string>
+    <string name="mk_no_subscription">Tu Apple ID no tiene una suscripción activa a Apple Music.</string>
+    <string name="mk_expired">Tu suscripción a Apple Music ha expirado.</string>
+    <string name="mk_token_rejected">Apple rechazó el Developer Token. Verifica tu Team ID, Key ID y llave .p8.</string>
+    <string name="mk_generic_error">Error al iniciar sesión con Apple Music (%1$s).</string>
+
+    <!-- Textos que arma la app (Apple manda el resto en el idioma de la cuenta) -->
+    <string name="home_top_picks">Sugerencias destacadas para ti</string>
+    <string name="home_recently_played">Escuchado recientemente</string>
+    <string name="home_made_for_you">Playlists hechas para ti</string>
+    <string name="home_more_like">Más como</string>
+    <string name="badge_listen_again">Volver a escuchar</string>
+    <string name="badge_made_for_you">Hechos para ti</string>
+    <string name="badge_new_release">Novedad</string>
+    <string name="badge_featuring">Destacando a %1$s</string>
+    <string name="badge_mood">Estado de ánimo para ti</string>
+    <string name="badge_live">EN VIVO</string>
+    <string name="untitled">Sin título</string>
+    <string name="top_playlists">Top playlists</string>
+    <string name="top_albums">Top álbumes</string>
+    <string name="top_songs">Top canciones</string>
+    <string name="error_no_recommendations">No se pudieron cargar recomendaciones personalizadas.</string>
+</resources>

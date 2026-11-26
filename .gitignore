@@ -1,0 +1,27 @@
+# IDE & Gradle
+*.iml
+.gradle/
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Local config & Secrets (NEVER commit to GitHub)
+local.properties
+apple_music.properties
+keystore.properties
+google-services.json
+.env
+.env.*
+*.p8
+*.pem
+*.key
+*.jks
+*.keystore
+
+# Build artifacts
+*.apk
+*.aab

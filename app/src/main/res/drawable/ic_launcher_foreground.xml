@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Capa monocromática para Iconos Temáticos de Android (Material You), fiel al logo oficial de Liramu -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34,30 C34,27.8 35.8,26 38,26 L42,26 C44.2,26 46,27.8 46,30 L46,66 L61,66 C63.2,66 65,67.8 65,70 L65,72.5 C65,74.7 63.2,76.5 61,76.5 L38,76.5 C35.8,76.5 34,74.7 34,72.5 Z" />
+    <!-- Curva de lira y mástil musical -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M62,33 C62,30.2 64.2,28 67,28 C72.5,28 77.2,31.4 78.6,36.4 C79.1,38.3 77.9,40.2 76,40.7 C74.1,41.2 72.2,40 71.7,38.1 C71.2,36.2 69.6,35 67.6,35 L67.6,59 C67.6,64.2 63.1,68.2 57.6,68.2 C52.1,68.2 47.6,64.2 47.6,59 C47.6,53.8 52.1,49.8 57.6,49.8 C59.3,49.8 60.8,50.2 62,50.9 Z" />
+    <!-- Onda armónica sutil -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M51,38.5 C51,36.8 52.4,35.5 54,35.5 L57.5,35.5 C59.2,35.5 60.5,36.8 60.5,38.5 C60.5,40.2 59.2,41.5 57.5,41.5 L54,41.5 C52.4,41.5 51,40.2 51,38.5 Z" />
+</vector>

@@ -1,0 +1,11 @@
+# Copy this file to `apple_music.properties` (which is gitignored) and fill in your credentials.
+# Never commit your real keys or .p8 private key file!
+
+APPLE_TEAM_ID=YOUR_10_CHAR_TEAM_ID
+APPLE_KEY_ID=YOUR_10_CHAR_KEY_ID
+APPLE_P8_PATH=AuthKey_XXXXXXXXXX.p8
+APPLE_STOREFRONT=mx
+
+# Optional: leave blank to sign automatically from APPLE_P8_PATH at build time
+APPLE_DEVELOPER_TOKEN=
+APPLE_MUSIC_USER_TOKEN=
